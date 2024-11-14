@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>three-audio-visualizer</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <script id="vertexShader" type="x-shader/x-vertex">
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = vec4(position, 1.0);
+        }
+    </script>
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        precision mediump float;
+        uniform float time;
+        uniform sampler2D tAudioData;
+        uniform vec2 resolution;
+        uniform sampler2D uTex;
+        uniform sampler2D uMask;
+        varying vec2 vUv;
+
+        void main() {
+            vec2 uv = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+            vec2 texUv = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y) + 0.5;
+
+            float f = texture2D(tAudioData, vec2(uv.x, 0.0)).r;
+
+            // ビジュアライザ
+            float cs;
+            for(float i = 0.0; i < 3.0; i++) {
+                float f = 0.01 / abs(length(uv) - (0.6 * abs(sin(time + 0.5 * i))));
+                cs = cs + f;
+            }
+
+            // プロフィール画像と円形クリップ
+            vec3 profileTex = texture2D(uTex, texUv).rgb;
+            vec3 maskTex = texture2D(uMask, texUv).rgb;
+
+            // 背景色をピックアップしてミックス
+            vec3 pickColor1 = texture2D(uTex, vec2(0.3, 0.3)).rgb;
+            vec3 pickColor2 = texture2D(uTex, vec2(0.7, 0.7)).rgb;
+            vec3 pickColor = mix(pickColor1, pickColor2, 0.5);
+
+            // ビジュアライザと合成
+            vec3 backColor = max(vec3(cs), pickColor);
+            vec3 mixedTex = backColor;
+            if (texUv.x >= 0. && texUv.x <= 1. && texUv.y >= 0. && texUv.y <= 1.) {
+                mixedTex = mix(profileTex, backColor, maskTex.r);
+            }
+            
+            gl_FragColor = vec4(mixedTex, 1.0);
+        }
+    </script>
+</head>
+<body>
+    <audio id="audio" controls src="./Demo Track 1.mp3"></audio>
+    <div id="container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        let scene, camera, renderer, analyser, uniforms;
+
+        const fftSize = 128;
+        const WIDTH = 600;
+        const HEIGHT = 400;
+
+        scene = new THREE.Scene();
+        camera = new THREE.OrthographicCamera()
+        camera.left = WIDTH / -2;
+        camera.right = WIDTH / 2;
+        camera.top = HEIGHT / 2;
+        camera.bottom = HEIGHT / -2;
+        camera.updateProjectionMatrix();
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(WIDTH, HEIGHT);
+
+        const container = document.getElementById('container');
+        container.appendChild(renderer.domElement);
+
+        const audioElement = document.getElementById('audio');
+        audioElement.onplay = play;
+
+        const loader = new THREE.TextureLoader();
+        const texture = loader.load('./profile.png');
+        const maskTexture = loader.load('./circlemask.png');
+
+        init();
+
+        function init() {
+            uniforms = {
+                uTex: { value: texture },
+                uMask: { value: maskTexture },
+                time: {
+                    value: 0
+                },
+                resolution: {
+                    value: new THREE.Vector2(WIDTH, HEIGHT)
+                }
+            };
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: uniforms,
+                vertexShader: document.getElementById('vertexShader').textContent,
+                fragmentShader: document.getElementById('fragmentShader').textContent
+            });
+
+            const geometry = new THREE.PlaneGeometry(2, 2);
+
+            const mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+
+            renderer.setAnimationLoop(() => {
+                uniforms.time.value += 0.01;
+                renderer.render(scene, camera);
+            });
+        }
+
+        function play() {
+            const listener = new THREE.AudioListener();
+            const sound = new THREE.Audio(listener);
+
+            sound.setMediaElementSource(audioElement);
+
+            camera.add(listener);
+
+            analyser = new THREE.AudioAnalyser(sound, fftSize);
+
+            uniforms = {
+                tAudioData: { value: new THREE.DataTexture(analyser.data, fftSize / 2, 1, THREE.RedFormat) },
+                uTex: { value: texture },
+                uMask: { value: maskTexture },
+                time: {
+                    value: 0
+                },
+                resolution: {
+                    value: new THREE.Vector2(WIDTH, HEIGHT)
+                }
+            };
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: uniforms,
+                vertexShader: document.getElementById('vertexShader').textContent,
+                fragmentShader: document.getElementById('fragmentShader').textContent
+            });
+
+            const geometry = new THREE.PlaneGeometry(2, 2);
+
+            const mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+
+            renderer.setAnimationLoop(animate);
+        }
+
+        function animate() {
+            analyser.getFrequencyData();
+            uniforms.tAudioData.value.needsUpdate = true;
+            uniforms.time.value += 0.01;
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+
+</html>
