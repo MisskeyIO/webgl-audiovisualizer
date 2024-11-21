@@ -169,6 +169,8 @@
         const audioElement = document.getElementById('audio');
         audioElement.volume = 0.5;
         audioElement.onplay = play;
+        audioElement.onplaying = playing;
+        audioElement.onpause = pause;
 
         const loader = new THREE.TextureLoader();
         let texture = loader.load('./profile.png');
@@ -281,6 +283,14 @@
             scene.add(mesh);
 
             renderer.setAnimationLoop(animate);
+        }
+
+        function playing() {
+            uniforms.enableAudio.value = 1;
+        }
+
+        function pause() {
+            uniforms.enableAudio.value = 0;
         }
 
         let frame = 0;
