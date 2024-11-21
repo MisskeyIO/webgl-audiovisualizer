@@ -17,7 +17,6 @@
         uniform float enableAudio;
         uniform sampler2D tAudioData1;
         uniform sampler2D tAudioData2;
-        uniform sampler2D tAudioData3;
         uniform vec2 resolution;
         uniform sampler2D uTex;
         uniform sampler2D uMask;
@@ -26,8 +25,8 @@
         const float PI  = 3.141592653589793;
         const float PI2 = PI * 2.;
         const float oneStep = 1.0 / 128.0;
-        const float speed1 = 5.0;
-        const float speed2 = 6.0;
+        const float speed1 = 3.0;
+        const float speed2 = 4.0;
 
         float random(vec2 st) {
             return fract(sin(dot(st.xy, vec2(12.9898,78.233)))* 43758.5453123);
@@ -80,25 +79,21 @@
                     if (angle < 0.5) {
                         float audio1a = sin(texture2D(tAudioData1, vec2(stepAngle * 2.0, 0.0)).r);
                         float audio2a = sin(texture2D(tAudioData2, vec2(stepAngle * 2.0, 0.0)).r);
-                        float audio3a = sin(texture2D(tAudioData3, vec2(stepAngle * 2.0, 0.0)).r);
-                        float audioA = mix(mix(audio1a, audio2a, 0.7), audio3a, 0.7);
+                        float audioA = mix(audio1a, audio2a, audio1a < audio2a);
 
                         float audio1b = sin(texture2D(tAudioData1, vec2((stepAngle + oneStep) * 2.0, 0.0)).r);
                         float audio2b = sin(texture2D(tAudioData2, vec2((stepAngle + oneStep) * 2.0, 0.0)).r);
-                        float audio3b = sin(texture2D(tAudioData3, vec2((stepAngle + oneStep) * 2.0, 0.0)).r);
-                        float audioB = mix(mix(audio1b, audio2b, 0.7), audio3b, 0.7);
+                        float audioB = mix(audio1b, audio2b, audio1b < audio2b);
 
                         shape += circle(uv, audioA, audioB, angle);
                     } else {
                         float audio1a = sin(texture2D(tAudioData1, vec2((1.0 - (stepAngle - 0.5) * 2.0), 0.0)).r);
                         float audio2a = sin(texture2D(tAudioData2, vec2((1.0 - (stepAngle - 0.5) * 2.0), 0.0)).r);
-                        float audio3a = sin(texture2D(tAudioData3, vec2((1.0 - (stepAngle - 0.5) * 2.0), 0.0)).r);
-                        float audioA = mix(mix(audio1a, audio2a, 0.7), audio3a, 0.7);
+                        float audioA = mix(audio1a, audio2a, audio1a < audio2a);
 
                         float audio1b = sin(texture2D(tAudioData1, vec2((1.0 - (stepAngle + oneStep - 0.5) * 2.0), 0.0)).r);
                         float audio2b = sin(texture2D(tAudioData2, vec2((1.0 - (stepAngle + oneStep - 0.5) * 2.0), 0.0)).r);
-                        float audio3b = sin(texture2D(tAudioData3, vec2((1.0 - (stepAngle + oneStep - 0.5) * 2.0), 0.0)).r);
-                        float audioB = mix(mix(audio1b, audio2b, 0.7), audio3b, 0.7);
+                        float audioB = mix(audio1b, audio2b, audio1b < audio2b);
 
                         shape += circle(uv, audioA, audioB, angle);
                     }
@@ -236,7 +231,6 @@
         let bufferLength;
         let dataArray1;
         let dataArray2;
-        let dataArray3;
 
         function play() {
             const listener = new THREE.AudioListener();
@@ -252,7 +246,6 @@
             bufferLength = analyserNode.frequencyBinCount;
             dataArray1 = new Uint8Array(bufferLength);
             dataArray2 = new Uint8Array(bufferLength);
-            dataArray3 = new Uint8Array(bufferLength);
 
             uniforms = {
                 enableAudio: {
@@ -260,7 +253,6 @@
                 },
                 tAudioData1: { value: new THREE.DataTexture(dataArray1, fftSize / 2, 1, THREE.RedFormat) },
                 tAudioData2: { value: new THREE.DataTexture(dataArray2, fftSize / 2, 1, THREE.RedFormat) },
-                tAudioData3: { value: new THREE.DataTexture(dataArray3, fftSize / 2, 1, THREE.RedFormat) },
                 uTex: { value: texture },
                 uMask: { value: maskTexture },
                 time: {
@@ -285,27 +277,35 @@
             renderer.setAnimationLoop(animate);
         }
 
+        let playingFlag = false;
         function playing() {
-            uniforms.enableAudio.value = 1;
+            playingFlag = true;
         }
 
         function pause() {
-            uniforms.enableAudio.value = 0;
+            playingFlag = false;
         }
 
         let frame = 0;
         function animate(time) {
             if (analyserNode) {
-                if (frame % 6 === 0) {
-                    dataArray3.set(dataArray2);
-                    uniforms.tAudioData3.value.needsUpdate = true;
-                }
                 if (frame % 4 === 0) {
-                    dataArray2.set(dataArray1);
+                    for (let i = 0; i < bufferLength; i++) {
+                        if (dataArray1[i] > dataArray2[i]) {
+                            dataArray2[i] = dataArray1[i] * 0.5 + dataArray2[i] * 0.5;
+                        } else {
+                            dataArray2[i] = dataArray1[i] * 0.05 + dataArray2[i] * 0.95;
+                        }
+                    }
                     uniforms.tAudioData2.value.needsUpdate = true;
-                }
-                if (frame % 2 === 0) {
-                    analyserNode.getByteTimeDomainData(dataArray1);
+
+                    if (playingFlag) {
+                        analyserNode.getByteTimeDomainData(dataArray1);
+                    } else {
+                        for (let i = 0; i < bufferLength; i++) {
+                            dataArray1[i] = 0;
+                        }
+                    }
                     uniforms.tAudioData1.value.needsUpdate = true;
                 }
                 frame++;
