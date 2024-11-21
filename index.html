@@ -25,6 +25,7 @@
 
         const float PI  = 3.141592653589793;
         const float PI2 = PI * 2.;
+        const float oneStep = 1.0 / 128.0;
         const float speed1 = 5.0;
         const float speed2 = 6.0;
 
@@ -43,8 +44,10 @@
             return mix(a, b, u.x) + (c - a)* u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
         }
 
-        float circle(vec2 uv, float audio) {
-            return step(length(uv), smoothstep(0.3, 0.9, audio + 0.12) * 0.7 + 0.1 * noise(vec2(audio, time / 30000.0)));
+        float circle(vec2 uv, float audioA, float audioB, float angle) {
+            float ratioInStep = fract(angle / oneStep);
+            float size = mix(audioA, audioB, ratioInStep);
+            return step(length(uv), smoothstep(0.0, 0.7, size) * 2.0 - 1.0) + 0.1 * noise(vec2(size, time / 30000.0));
         }
 
         float stepValue(float value, float stepSize) {
@@ -64,26 +67,40 @@
             for (int i = 0; i < int(2); i++) {
                 // 回転
                 if (i == 1) {
-                    angle = fract(angleBase + (sin(time / 30000.0 * speed1)));
+                    angle = fract(angleBase + abs(sin(time / 30000.0 * speed1)));
                 } else {
-                    angle = fract(angleBase - (sin(time / 30000.0 * speed2)));
+                    angle = fract(angleBase - abs(sin(time / 30000.0 * speed2)));
                 }
+
+                float stepAngle = stepValue(angle, oneStep);
 
                 if (enableAudio < 0.5) {
                 } else {
                     // 音声解析情報
                     if (angle < 0.5) {
-                        float audio1 = sin(texture2D(tAudioData1, vec2(angle * 2.0, 0.0)).r);
-                        float audio2 = sin(texture2D(tAudioData2, vec2(angle * 2.0, 0.0)).r);
-                        float audio3 = sin(texture2D(tAudioData3, vec2(angle * 2.0, 0.0)).r);
-                        float audio = mix(mix(audio1, audio2, 0.7), audio3, 0.7);
-                        shape += circle(uv, audio);
+                        float audio1a = sin(texture2D(tAudioData1, vec2(stepAngle * 2.0, 0.0)).r);
+                        float audio2a = sin(texture2D(tAudioData2, vec2(stepAngle * 2.0, 0.0)).r);
+                        float audio3a = sin(texture2D(tAudioData3, vec2(stepAngle * 2.0, 0.0)).r);
+                        float audioA = mix(mix(audio1a, audio2a, 0.7), audio3a, 0.7);
+
+                        float audio1b = sin(texture2D(tAudioData1, vec2((stepAngle + oneStep) * 2.0, 0.0)).r);
+                        float audio2b = sin(texture2D(tAudioData2, vec2((stepAngle + oneStep) * 2.0, 0.0)).r);
+                        float audio3b = sin(texture2D(tAudioData3, vec2((stepAngle + oneStep) * 2.0, 0.0)).r);
+                        float audioB = mix(mix(audio1b, audio2b, 0.7), audio3b, 0.7);
+
+                        shape += circle(uv, audioA, audioB, angle);
                     } else {
-                        float audio1 = sin(texture2D(tAudioData1, vec2((1.0 - (angle - 0.5) * 2.0), 0.0)).r);
-                        float audio2 = sin(texture2D(tAudioData2, vec2((1.0 - (angle - 0.5) * 2.0), 0.0)).r);
-                        float audio3 = sin(texture2D(tAudioData3, vec2((1.0 - (angle - 0.5) * 2.0), 0.0)).r);
-                        float audio = mix(mix(audio1, audio2, 0.7), audio3, 0.7);
-                        shape += circle(uv, audio);
+                        float audio1a = sin(texture2D(tAudioData1, vec2((1.0 - (stepAngle - 0.5) * 2.0), 0.0)).r);
+                        float audio2a = sin(texture2D(tAudioData2, vec2((1.0 - (stepAngle - 0.5) * 2.0), 0.0)).r);
+                        float audio3a = sin(texture2D(tAudioData3, vec2((1.0 - (stepAngle - 0.5) * 2.0), 0.0)).r);
+                        float audioA = mix(mix(audio1a, audio2a, 0.7), audio3a, 0.7);
+
+                        float audio1b = sin(texture2D(tAudioData1, vec2((1.0 - (stepAngle + oneStep - 0.5) * 2.0), 0.0)).r);
+                        float audio2b = sin(texture2D(tAudioData2, vec2((1.0 - (stepAngle + oneStep - 0.5) * 2.0), 0.0)).r);
+                        float audio3b = sin(texture2D(tAudioData3, vec2((1.0 - (stepAngle + oneStep - 0.5) * 2.0), 0.0)).r);
+                        float audioB = mix(mix(audio1b, audio2b, 0.7), audio3b, 0.7);
+
+                        shape += circle(uv, audioA, audioB, angle);
                     }
                 }
             }
@@ -114,7 +131,7 @@
         <input style="margin-bottom: 10px;" type="file" id="audioFileInput" accept="audio/*">
         <span>Choose an profile image file:</span>
         <input style="margin-bottom: 10px;" type="file" id="profileFileInput" accept="image/*">
-        <audio id="audio" controls src="./Demo Track 1.mp3"></audio>
+        <audio id="audio" controls src="./preview.wav"></audio>
     </div>
     <div id="container"></div>
 
@@ -150,6 +167,7 @@
         container.appendChild(renderer.domElement);
 
         const audioElement = document.getElementById('audio');
+        audioElement.volume = 0.5;
         audioElement.onplay = play;
 
         const loader = new THREE.TextureLoader();
