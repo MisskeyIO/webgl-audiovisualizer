@@ -109,7 +109,13 @@
     </script>
 </head>
 <body>
-    <audio id="audio" controls src="./Demo Track 1.mp3"></audio>
+    <div style="display: grid; margin-bottom: 10px;">
+        <span>Choose an audio file:</span>
+        <input style="margin-bottom: 10px;" type="file" id="audioFileInput" accept="audio/*">
+        <span>Choose an profile image file:</span>
+        <input style="margin-bottom: 10px;" type="file" id="profileFileInput" accept="image/*">
+        <audio id="audio" controls src="./Demo Track 1.mp3"></audio>
+    </div>
     <div id="container"></div>
 
     <script type="importmap">
@@ -147,10 +153,35 @@
         audioElement.onplay = play;
 
         const loader = new THREE.TextureLoader();
-        const texture = loader.load('./profile.png');
+        let texture = loader.load('./profile.png');
         const maskTexture = loader.load('./circlemask.png');
 
         init();
+
+        document.getElementById('audioFileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                audioElement.src = url;
+            }
+        });
+
+        document.getElementById('profileFileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        texture = new THREE.Texture(img);
+                        texture.needsUpdate = true;
+                        uniforms.uTex.value = texture;
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
 
         function init() {
             uniforms = {
