@@ -24,7 +24,7 @@
 
         const float PI  = 3.141592653589793;
         const float PI2 = PI * 2.;
-        const float oneStep = 1.0 / 128.0;
+        const float oneStep = 1.0 / 32.0;
         const float speed1 = 3.0;
         const float speed2 = 4.0;
 
@@ -55,7 +55,7 @@
         float circle(vec2 uv, float audioA, float audioB, float angle) {
             float ratioInStep = fract(angle / oneStep);
             float size = cubicBezier(vec2(-1.0, audioA), vec2(0.0, audioA), vec2(0.0, audioB), vec2(1.0, audioB), ratioInStep).y;
-            return step(length(uv), size * 1.2);
+            return step(length(uv), (size * 3.0) - 0.8);
         }
 
         float stepValue(float value, float stepSize) {
@@ -92,12 +92,12 @@
                 // レイヤー1
                 float audio1A = sin(texture2D(tAudioData1, vec2(xA, 0.0)).r);
                 float audio1B = sin(texture2D(tAudioData1, vec2(xB, 0.0)).r);
-                shape += circle(uv, audio1A, audio1B, angle);
+                shape += circle(uv, audio1A, audio1B, angle) * 0.8;
 
                 // レイヤー2
                 float audio2A = sin(texture2D(tAudioData2, vec2(xA, 0.0)).r);
                 float audio2B = sin(texture2D(tAudioData2, vec2(xB, 0.0)).r);
-                shape += circle(uv, audio2A, audio2B, angle);
+                shape += circle(uv, audio2A, audio2B, angle) * 0.8;
             }
 
             // プロフィール画像と円形クリップ
@@ -300,14 +300,16 @@
             }
 
             if (analyserNode) {
-                for (let i = 0; i < bufferLength; i++) {
-                    let n1 = (i + angle1) % bufferLength;
-                    let n2 = (i + angle2) % bufferLength;
-                    if (dataArrayOrigin[n1] > dataArray1[i]) {
-                        dataArray1[i] = dataArrayOrigin[n1];
-                    }
-                    if (dataArrayOrigin[n2] > dataArray2[i]) {
-                        dataArray2[i] = dataArrayOrigin[n2];
+                if ((time - prevTime) > 10) {
+                    for (let i = 0; i < bufferLength; i++) {
+                        let n1 = (i + angle1) % bufferLength;
+                        let n2 = (i + angle2) % bufferLength;
+                        if (dataArrayOrigin[n1] > dataArray1[i]) {
+                            dataArray1[i] = dataArray1[i] < 255 ? (dataArrayOrigin[i] + dataArray1[i])/2 : 255;
+                        }
+                        if (dataArrayOrigin[n2] > dataArray2[i]) {
+                            dataArray2[i] = dataArray2[i] < 255 ? (dataArrayOrigin[i] + dataArray2[i])/2 : 255;
+                        }
                     }
                 }
                 if ((time - prevTime) > 20) {
@@ -334,8 +336,8 @@
                     }
                 }
 
-                angle1 += parseInt(bufferLength / 360 * 3);
-                angle2 += parseInt(bufferLength / 360 * 7);
+                angle1 += parseInt(bufferLength / 360 * 2);
+                angle2 += parseInt(bufferLength / 360 * 3);
             }
             uniforms.time.value = time;
             renderer.render(scene, camera);
