@@ -286,7 +286,7 @@
             }
 
             if (analyserNode) {
-                if ((time - prevTime) > 10) {
+                if ((time - prevTime) > 20) {
                     for (let i = 0; i < bufferLength; i++) {
                         let n1 = (i + angle1) % bufferLength;
                         let n2 = (i + angle2) % bufferLength;
@@ -297,8 +297,6 @@
                             dataArray2[i] = dataArray2[i] < 255 ? (dataArrayOrigin[i] + dataArray2[i])/2 : 255;
                         }
                     }
-                }
-                if ((time - prevTime) > 20) {
                     for (let i = 0; i < bufferLength; i++) {
                         let n1 = (i + angle1) % bufferLength;
                         let n2 = (i + angle2) % bufferLength;
