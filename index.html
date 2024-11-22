@@ -111,7 +111,7 @@
             vec3 pickColor = mix(pickColor1, pickColor2, 0.5);
 
             // 背景と各レイヤーを合成
-            vec3 backColor = pickColor;
+            vec3 backColor = mix(pickColor, vec3(0.0), 0.1);
             backColor = mix(backColor, mix(pickColor, vec3(1.0), 0.2), shape1);
             backColor = mix(backColor, mix(pickColor, vec3(1.0), 0.5), shape2);
             vec3 mixedTex = backColor;
