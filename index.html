@@ -46,7 +46,7 @@
         float circle(vec2 uv, float audioA, float audioB, float angle) {
             float ratioInStep = fract(angle / oneStep);
             float size = mix(audioA, audioB, ratioInStep);
-            return step(length(uv), (smoothstep(0.0, 0.7, size + 0.01 * noise(vec2(size, time / 30000.0))) * 2.0 - 1.0) * 0.85 + 0.12);
+            return step(length(uv), (smoothstep(0.0, 0.7, size) * 2.0 - 1.0) * 0.85 + 0.12);
         }
 
         float stepValue(float value, float stepSize) {
@@ -58,46 +58,37 @@
             vec2 texUv = uv / 0.8 + 0.5;
 
             // ベクトルから角度を取得して正規化
-            float angleBase = fract(atan(uv.y, uv.x) / PI2); // 0.0 ~ 1.0
+            float angle = fract(atan(uv.y, uv.x) / PI2); // 0.0 ~ 1.0
+
+            // 分解能に補正した角度
+            float stepAngle = stepValue(angle, oneStep);
 
             // ビジュアライザ
             float shape = 0.0;
-            float angle = 0.0;
-            for (int i = 0; i < int(2); i++) {
-                // 回転
-                if (i == 1) {
-                    angle = fract(angleBase + abs(sin(time / 30000.0 * speed1)));
+            if (enableAudio < 0.5) {
+                // 停止時は描画しない
+            } else {
+                // 音声解析情報
+                float xA;
+                float xB;
+
+                if (angle < 0.5) {
+                    xA = stepAngle * 2.0;
+                    xB = (stepAngle + oneStep) * 2.0;
                 } else {
-                    angle = fract(angleBase - abs(sin(time / 30000.0 * speed2)));
+                    xA = 1.0 - (stepAngle - 0.5) * 2.0;
+                    xB = 1.0 - (stepAngle + oneStep - 0.5) * 2.0;
                 }
 
-                float stepAngle = stepValue(angle, oneStep);
+                // レイヤー1
+                float audio1A = sin(texture2D(tAudioData1, vec2(xA, 0.0)).r);
+                float audio1B = sin(texture2D(tAudioData1, vec2(xB, 0.0)).r);
+                shape += circle(uv, audio1A, audio1B, angle);
 
-                if (enableAudio < 0.5) {
-                } else {
-                    // 音声解析情報
-                    if (angle < 0.5) {
-                        float audio1a = sin(texture2D(tAudioData1, vec2(stepAngle * 2.0, 0.0)).r);
-                        float audio2a = sin(texture2D(tAudioData2, vec2(stepAngle * 2.0, 0.0)).r);
-                        float audioA = mix(audio1a, audio2a, audio1a < audio2a);
-
-                        float audio1b = sin(texture2D(tAudioData1, vec2((stepAngle + oneStep) * 2.0, 0.0)).r);
-                        float audio2b = sin(texture2D(tAudioData2, vec2((stepAngle + oneStep) * 2.0, 0.0)).r);
-                        float audioB = mix(audio1b, audio2b, audio1b < audio2b);
-
-                        shape += circle(uv, audioA, audioB, angle);
-                    } else {
-                        float audio1a = sin(texture2D(tAudioData1, vec2((1.0 - (stepAngle - 0.5) * 2.0), 0.0)).r);
-                        float audio2a = sin(texture2D(tAudioData2, vec2((1.0 - (stepAngle - 0.5) * 2.0), 0.0)).r);
-                        float audioA = mix(audio1a, audio2a, audio1a < audio2a);
-
-                        float audio1b = sin(texture2D(tAudioData1, vec2((1.0 - (stepAngle + oneStep - 0.5) * 2.0), 0.0)).r);
-                        float audio2b = sin(texture2D(tAudioData2, vec2((1.0 - (stepAngle + oneStep - 0.5) * 2.0), 0.0)).r);
-                        float audioB = mix(audio1b, audio2b, audio1b < audio2b);
-
-                        shape += circle(uv, audioA, audioB, angle);
-                    }
-                }
+                // レイヤー2
+                float audio2A = sin(texture2D(tAudioData2, vec2(xA, 0.0)).r);
+                float audio2B = sin(texture2D(tAudioData2, vec2(xB, 0.0)).r);
+                shape += circle(uv, audio2A, audio2B, angle);
             }
 
             // プロフィール画像と円形クリップ
@@ -229,6 +220,7 @@
 
         let analyserNode;
         let bufferLength;
+        let dataArrayOrigin;
         let dataArray1;
         let dataArray2;
 
@@ -244,6 +236,7 @@
 
             analyserNode = analyser.analyser;
             bufferLength = analyserNode.frequencyBinCount;
+            dataArrayOrigin = new Uint8Array(bufferLength);
             dataArray1 = new Uint8Array(bufferLength);
             dataArray2 = new Uint8Array(bufferLength);
 
@@ -286,29 +279,55 @@
             playingFlag = false;
         }
 
-        let frame = 0;
+        let prevTime = 0;
+        let angle1 = 0;
+        let angle2 = 0;
         function animate(time) {
-            if (analyserNode) {
-                if (frame % 4 === 0) {
-                    for (let i = 0; i < bufferLength; i++) {
-                        if (dataArray1[i] > dataArray2[i]) {
-                            dataArray2[i] = dataArray1[i] * 0.5 + dataArray2[i] * 0.5;
-                        } else {
-                            dataArray2[i] = dataArray1[i] * 0.05 + dataArray2[i] * 0.95;
-                        }
-                    }
-                    uniforms.tAudioData2.value.needsUpdate = true;
+            if (angle1 >= bufferLength) {
+                angle1 = 0;
+            }
+            if (angle2 >= bufferLength) {
+                angle2 = 0;
+            }
 
-                    if (playingFlag) {
-                        analyserNode.getByteTimeDomainData(dataArray1);
-                    } else {
-                        for (let i = 0; i < bufferLength; i++) {
-                            dataArray1[i] = 0;
+            if (analyserNode) {
+                for (let i = 0; i < bufferLength; i++) {
+                    let n1 = (i + angle1) % bufferLength;
+                    let n2 = (i + angle2) % bufferLength;
+                    if (dataArrayOrigin[n1] > dataArray1[i]) {
+                        dataArray1[i] = dataArrayOrigin[n1];
+                    }
+                    if (dataArrayOrigin[n2] > dataArray2[i]) {
+                        dataArray2[i] = dataArrayOrigin[n2];
+                    }
+                }
+                if ((time - prevTime) > 20) {
+                    for (let i = 0; i < bufferLength; i++) {
+                        let n1 = (i + angle1) % bufferLength;
+                        let n2 = (i + angle2) % bufferLength;
+                        if (dataArrayOrigin[n1] < dataArray1[i]) {
+                            dataArray1[i] = dataArray1[i] > 0 ? dataArray1[i] - 1 : 0;
+                        }
+                        if (dataArrayOrigin[n2] < dataArray2[i]) {
+                            dataArray2[i] = dataArray2[i] > 0 ? dataArray2[i] - 1 : 0;
                         }
                     }
                     uniforms.tAudioData1.value.needsUpdate = true;
+                    uniforms.tAudioData2.value.needsUpdate = true;
+                    prevTime = time;
                 }
-                frame++;
+
+                if (playingFlag) {
+                    analyserNode.getByteTimeDomainData(dataArrayOrigin);
+                } else {
+                    for (let i = 0; i < bufferLength; i++) {
+                        dataArray1[i] = 0;
+                        dataArray2[i] = 0;
+                    }
+                }
+
+                angle1 += parseInt(bufferLength / 360 * 3);
+                angle2 += parseInt(bufferLength / 360 * 7);
             }
             uniforms.time.value = time;
             renderer.render(scene, camera);
