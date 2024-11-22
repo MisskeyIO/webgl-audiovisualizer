@@ -43,10 +43,19 @@
             return mix(a, b, u.x) + (c - a)* u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
         }
 
+        vec2 cubicBezier(vec2 a, vec2 b, vec2 c, vec2 d, float q) {
+            vec2 qab = mix(a, b, q);
+            vec2 qbc = mix(b, c, q);
+            vec2 qcd = mix(c, d, q);
+            vec2 qabc = mix(qab, qbc, q);
+            vec2 qbcd = mix(qbc, qcd, q);
+            return mix(qabc, qbcd, q);
+        }
+
         float circle(vec2 uv, float audioA, float audioB, float angle) {
             float ratioInStep = fract(angle / oneStep);
-            float size = mix(audioA, audioB, ratioInStep);
-            return step(length(uv), (smoothstep(0.0, 0.7, size) * 2.0 - 1.0) * 0.85 + 0.12);
+            float size = cubicBezier(vec2(-1.0, audioA), vec2(0.0, audioA), vec2(0.0, audioB), vec2(1.0, audioB), ratioInStep).y;
+            return step(length(uv), size * 1.2);
         }
 
         float stepValue(float value, float stepSize) {
