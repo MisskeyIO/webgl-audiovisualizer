@@ -46,7 +46,7 @@
         float circle(vec2 uv, float audioA, float audioB, float angle) {
             float ratioInStep = fract(angle / oneStep);
             float size = mix(audioA, audioB, ratioInStep);
-            return step(length(uv), smoothstep(0.0, 0.7, size) * 2.0 - 1.0) + 0.1 * noise(vec2(size, time / 30000.0));
+            return step(length(uv), (smoothstep(0.0, 0.7, size + 0.01 * noise(vec2(size, time / 30000.0))) * 2.0 - 1.0) * 0.85 + 0.12);
         }
 
         float stepValue(float value, float stepSize) {
