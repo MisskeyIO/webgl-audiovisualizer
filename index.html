@@ -73,7 +73,8 @@
             float stepAngle = stepValue(angle, oneStep);
 
             // ビジュアライザ
-            float shape = 0.0;
+            float shape1 = 0.0;
+            float shape2 = 0.0;
             if (enableAudio < 0.5) {
                 // 停止時は描画しない
             } else {
@@ -92,12 +93,12 @@
                 // レイヤー1
                 float audio1A = sin(texture2D(tAudioData1, vec2(xA, 0.0)).r);
                 float audio1B = sin(texture2D(tAudioData1, vec2(xB, 0.0)).r);
-                shape += circle(uv, audio1A, audio1B, angle) * 0.8;
+                shape1 = circle(uv, audio1A, audio1B, angle) > 0.0 ? 1.0 : 0.0;
 
                 // レイヤー2
                 float audio2A = sin(texture2D(tAudioData2, vec2(xA, 0.0)).r);
                 float audio2B = sin(texture2D(tAudioData2, vec2(xB, 0.0)).r);
-                shape += circle(uv, audio2A, audio2B, angle) * 0.8;
+                shape2 = circle(uv, audio2A, audio2B, angle) > 0.0 ? 1.0 : 0.0;
             }
 
             // プロフィール画像と円形クリップ
@@ -110,7 +111,9 @@
             vec3 pickColor = mix(pickColor1, pickColor2, 0.5);
 
             // 背景と各レイヤーを合成
-            vec3 backColor = mix(vec3(shape), pickColor, 0.9);
+            vec3 backColor = pickColor;
+            backColor = mix(backColor, mix(pickColor, vec3(1.0), 0.2), shape1);
+            backColor = mix(backColor, mix(pickColor, vec3(1.0), 0.5), shape2);
             vec3 mixedTex = backColor;
             if (texUv.x >= 0. && texUv.x <= 1. && texUv.y >= 0. && texUv.y <= 1.) {
                 mixedTex = mix(profileTex, backColor, maskTex.r);
