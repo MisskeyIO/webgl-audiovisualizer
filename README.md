@@ -1,6 +1,6 @@
 デモ
 
-https://tar-bin.github.io/webgl-audiovisual-test/
+https://tar-bin.github.io/webgl-audiovisualizer/
 
 シェーダーはMITライセンスです。以下にホスティングしています。
 
